@@ -105,8 +105,6 @@ const seedDatabase = async () => {
 	}
 };
 
-
-
 // Define API endpoint for fetching all books
 app.get('/api/books', async (req, res) => {
 	try {
@@ -122,9 +120,10 @@ app.get('/api/books', async (req, res) => {
 });
 
 // Get cart contents
+
+
 app.get('/api/cart', async (req, res) => {
 	try {
-
 	  let cart = await Cart.findOne();
 	  if (!cart) {
 		cart =  new Cart({items: [], total:0});
@@ -139,46 +138,57 @@ app.get('/api/cart', async (req, res) => {
   
   // Add item to cart
   app.post('/api/cart/add', async (req, res) => {
-	try {
-		const userId = 'default-user';
-	  let cart = await Cart.findOne({userId});
+    try {
+        const userId = 'default-user';
+        let cart = await Cart.findOne({ userId });
 
-	  if (!cart) {
-		cart = new Cart({ items:[], total: 0});
-	}
+        if (!cart) {
+            cart = new Cart({ items: [], total: 0 });
+        }
 
-	const { _id, title, author, price, image } = req.body;
+        const { _id, title, author, price, image } = req.body;
 
-	const existingItemIndex = cart.items.findIndex(item =>
-		item.bookId.toString() === _id.toString()
-	);
+        console.log("Received request to add book:", _id);
 
-	if (existingItemIndex > -1) {
+        if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
+            console.error("Invalid book ID format:", _id);
+            return res.status(400).json({ error: 'Invalid book ID format' });
+        }
 
-        cart.items[existingItemIndex].quantity += 1;
-    } else {
+        const bookExists = await Book.findById(_id);
+        if (!bookExists) {
+            console.error("Book not found in database:", _id);
+            return res.status(400).json({ error: 'Invalid book ID' });
+        }
 
-        cart.items.push({
-			 bookId: _id, 
-			 title, 
-			 author, 
-			 price, 
-			 quantity: 1, 
-			 image 
-			});
-    	}
+        const existingItemIndex = cart.items.findIndex(item =>
+            item.bookId.toString() === _id.toString()
+        );
 
-		cart.total = cart.items.reduce((sum, item) => 
-			sum + (item.price * item.quantity), 0
-		);
+        if (existingItemIndex > -1) {
+            cart.items[existingItemIndex].quantity += 1;
+        } else {
+            cart.items.push({
+                bookId: _id,
+                title,
+                author,
+                price,
+                quantity: 1,
+                image
+            });
+        }
 
-		await cart.save();
-		res.json(cart);
-	}	 catch (error) {
-		console.error('Error fetching cart:', error);
+        cart.total = cart.items.reduce((sum, item) =>
+            sum + (item.price * item.quantity), 0
+        );
+
+        await cart.save();
+        res.json(cart);
+    } catch (error) {
+        console.error('Error adding to cart:', error);
         res.status(500).json({ error: 'Internal Server Error' });
-      }
-	});		
+    }
+});		
   
   // Remove item from cart
   app.delete('/api/cart/remove/:bookId', async (req, res) => {
