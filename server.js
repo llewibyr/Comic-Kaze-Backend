@@ -5,6 +5,8 @@ const mongoose = require('mongoose');
 const app = express();
 const PORT = process.env.PORT || 5001;
 const cors = require('cors');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 
 const mongoURI = process.env.MONGO_URI;
@@ -29,6 +31,14 @@ app.use(cors({
     credentials: true
   }));
   
+  const userSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true }
+});
+
+const User = mongoose.model('User', userSchema);
+
+
 const bookSchema = new mongoose.Schema({
 	title: String,
 	author: String,
@@ -70,6 +80,72 @@ const cartSchema = new mongoose.Schema({
   const Cart = mongoose.model('Cart', cartSchema);
 
 const Book = mongoose.model('Book', bookSchema);
+
+//User Registration Route
+app.post('/api/auth/register', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+
+        if (!username || !password) {
+            return res.status(400).json({ error: 'Username and password are required' });
+        }
+
+        const existingUser = await User.findOne({ username });
+        if (existingUser) {
+            return res.status(400).json({ error: 'Username already exists' });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newUser = new User({ username, password: hashedPassword });
+        await newUser.save();
+
+        res.json({ message: 'User registered successfully' });
+    } catch (error) {
+        console.error('Error registering user:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+//User Login Route
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+
+        const user = await User.findOne({ username });
+        if (!user) {
+            return res.status(400).json({ error: 'Invalid username or password' });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ error: 'Invalid username or password' });
+        }
+
+        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+
+        res.json({ token });
+    } catch (error) {
+        console.error('Error logging in:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+//Middleware to authenticate user
+const authenticateUser = (req, res, next) => {
+    const token = req.header('Authorization');
+
+    if (!token) {
+        return res.status(401).json({ error: 'Access denied. No token provided.' });
+    }
+
+    try {
+        const decoded = jwt.verify(token.replace('Bearer ', ''), process.env.JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch (error) {
+        res.status(401).json({ error: 'Invalid token' });
+    }
+};
 
 //middleware 
 app.use(express.json());
@@ -115,13 +191,12 @@ app.get('/api/books', async (req, res) => {
 });
 
 // Get cart contents
-app.get('/api/cart', async (req, res) => {
+app.get('/api/cart', authenticateUser, async (req, res) => {
     try {
-        const userId = 'default-user';
-        let cart = await Cart.findOne({ userId }).populate('items.bookId');
+        let cart = await Cart.findOne({ userId: req.user.userId }).populate('items.bookId');
 
         if (!cart) {
-            cart = new Cart({ userId, items: [], total: 0 });
+            cart = new Cart({ userId: req.user.userId, items: [], total: 0 });
             await cart.save();
         }
 
@@ -131,7 +206,8 @@ app.get('/api/cart', async (req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
-  
+
+
   // Add item to cart
   app.post('/api/cart/add', async (req, res) => {
     try {
