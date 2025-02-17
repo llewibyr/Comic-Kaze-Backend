@@ -1,8 +1,3 @@
+# App Name : Philosophers Stone
 
-```
-Comic-Kaze-Backend
-├─ package-lock.json
-├─ package.json
-└─ server.js
-
-```
+# Frontend README Link: https://vscode.dev/github/llewibyr/Comic-Kaze/blob/main/README.md
