@@ -89,13 +89,8 @@ const seedDatabase = async () => {
 			{ title: 'The Great Gatsby', author: 'F. Scott Fitzgerald', genre: 'Fiction', description: 'A classic novel about the American Dream', price: 20, image: 'https://media.geeksforgeeks.org/wp-content/uploads/20240110011815/sutterlin-1362879_640-(1).jpg' },
 			{ title: 'To Kill a Mockingbird', author: 'Harper Lee', genre: 'Fiction', description: 'A powerful story of racial injustice and moral growth', price: 15, image: 'https://media.geeksforgeeks.org/wp-content/uploads/20240110011854/reading-925589_640.jpg' },
 			{ title: '1984', author: 'George Orwell', genre: 'Dystopian', description: 'A dystopian vision of a totalitarian future society', price: 255, image: 'https://media.geeksforgeeks.org/wp-content/uploads/20240110011929/glasses-1052010_640.jpg' },
-			{ title: 'The Great Gatsby', author: 'F. Scott Fitzgerald', genre: 'Fiction', description: 'A classic novel about the American Dream', price: 220, image: 'https://media.geeksforgeeks.org/wp-content/uploads/20240110011929/glasses-1052010_640.jpg' },
-			{ title: 'To Kill a Mockingbird', author: 'Harper Lee', genre: 'Fiction', description: 'A powerful story of racial injustice and moral growth', price: 1115, image: 'https://media.geeksforgeeks.org/wp-content/uploads/20240110011929/glasses-1052010_640.jpg' },
-			{ title: '1984', author: 'George Orwell', genre: 'Dystopian', description: 'A dystopian vision of a totalitarian future society', price: 125, image: 'https://media.geeksforgeeks.org/wp-content/uploads/20240110011929/glasses-1052010_640.jpg' },
             
                 
-            
-    
 		];
 		
 		await Book.insertMany(books);
@@ -120,21 +115,22 @@ app.get('/api/books', async (req, res) => {
 });
 
 // Get cart contents
-
-
 app.get('/api/cart', async (req, res) => {
-	try {
-	  let cart = await Cart.findOne();
-	  if (!cart) {
-		cart =  new Cart({items: [], total:0});
-		await cart.save();
-	  }
-	  res.json(cart);
-	} catch (error) {
-	  console.error('Error fetching cart:', error);
-	  res.status(500).json({ error: 'Internal Server Error' });
-	}
-  });
+    try {
+        const userId = 'default-user';
+        let cart = await Cart.findOne({ userId }).populate('items.bookId');
+
+        if (!cart) {
+            cart = new Cart({ userId, items: [], total: 0 });
+            await cart.save();
+        }
+
+        res.json(cart);
+    } catch (error) {
+        console.error('Error fetching cart:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
   
   // Add item to cart
   app.post('/api/cart/add', async (req, res) => {
@@ -161,12 +157,10 @@ app.get('/api/cart', async (req, res) => {
             return res.status(400).json({ error: 'Invalid book ID' });
         }
 
-        const existingItemIndex = cart.items.findIndex(item =>
-            item.bookId.toString() === _id.toString()
-        );
+        const existingItem = cart.items.find(item => item.bookId.toString() === _id);
 
-        if (existingItemIndex > -1) {
-            cart.items[existingItemIndex].quantity += 1;
+        if (existingItem) {
+            existingItem.quantity += 1;
         } else {
             cart.items.push({
                 bookId: _id,
@@ -178,29 +172,28 @@ app.get('/api/cart', async (req, res) => {
             });
         }
 
-        cart.total = cart.items.reduce((sum, item) =>
-            sum + (item.price * item.quantity), 0
-        );
-
+        cart.total = cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
         await cart.save();
+
         res.json(cart);
     } catch (error) {
         console.error('Error adding to cart:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});		
+});	
   
   // Remove item from cart
   app.delete('/api/cart/remove/:bookId', async (req, res) => {
 	try {
 		const userId = 'default-user';
-	    const cart = await Cart.findOne({ userId});
+		const bookId = req.params.bookId;
+
+	    let cart = await Cart.findOne({ userId });
+
 
 	  if (!cart) {
 		return res.status(404).json({ error: 'Cart not found' });
 	  }
-  
-	  const bookId = req.params.bookId;
 
 	  const itemIndex = cart.items.findIndex(
 		item => item.bookId.toString() === bookId
@@ -218,18 +211,15 @@ app.get('/api/cart', async (req, res) => {
 		}
 	  
 
-	  cart.total = cart.items.reduce((sum, item) =>
-	    sum + (item.price * item.quantity), 0
-	);
-	  
-	  
-	  await cart.save();
-	  res.json(cart);
-	} catch (error) {
-	  console.error('Error removing from cart:', error);
-	  res.status(500).json({ error: 'Internal Server Error' });
-	}
-  });
+		cart.total = cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        await cart.save();
+
+        res.json(cart);
+    } catch (error) {
+        console.error('Error removing from cart:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
 
 app.listen(PORT, () => {
 	console.log(`Server is running on port ${PORT}`);
