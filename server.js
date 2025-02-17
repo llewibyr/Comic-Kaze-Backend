@@ -130,6 +130,10 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
+app.post('/api/auth/logout', (req, res) => {
+    res.clearCookie('token').json({ message: 'Logged out successfully' });
+});
+
 //Middleware to authenticate user
 const authenticateUser = (req, res, next) => {
     const token = req.header('Authorization');
@@ -166,7 +170,6 @@ const seedDatabase = async () => {
 			{ title: 'To Kill a Mockingbird', author: 'Harper Lee', genre: 'Fiction', description: 'A powerful story of racial injustice and moral growth', price: 15, image: 'https://media.geeksforgeeks.org/wp-content/uploads/20240110011854/reading-925589_640.jpg' },
 			{ title: '1984', author: 'George Orwell', genre: 'Dystopian', description: 'A dystopian vision of a totalitarian future society', price: 255, image: 'https://media.geeksforgeeks.org/wp-content/uploads/20240110011929/glasses-1052010_640.jpg' },
             
-                
 		];
 		
 		await Book.insertMany(books);
@@ -285,7 +288,9 @@ app.get('/api/cart', authenticateUser, async (req, res) => {
 		} else {
 			cart.items.splice(itemIndex, 1);
 		}
-	  
+        
+        cart.items = []; // Remove all items
+        cart.total = 0;
 
 		cart.total = cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
         await cart.save();
