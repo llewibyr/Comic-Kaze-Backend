@@ -193,18 +193,29 @@ app.get('/api/cart', async (req, res) => {
   // Remove item from cart
   app.delete('/api/cart/remove/:bookId', async (req, res) => {
 	try {
-	    let cart = await Cart.findOne();
+		const userId = 'default-user';
+	    const cart = await Cart.findOne({ userId});
+
+	  if (!cart) {
+		return res.status(404).json({ error: 'Cart not found' });
+	  }
   
 	  const bookId = req.params.bookId;
 
-	  if (!bookId) {
-		return res.status(400).json({ error: 'Book ID is required' });
-	  }
-	 
+	  const itemIndex = cart.items.findIndex(
+		item => item.bookId.toString() === bookId
+	  );
 
-      cart.items = cart.items.filter(item => 
-		item.bookId.toString()!== bookId
-	);
+	  if (itemIndex === -1) {
+		return res.status(400).json({error: 'Item not found in cart'});
+	  }
+
+
+	 if (cart.items[itemIndex].quantity > 1) {
+		cart.items[itemIndex].quantity -= 1;
+		} else {
+			cart.items.splice(itemIndex, 1);
+		}
 	  
 
 	  cart.total = cart.items.reduce((sum, item) =>
