@@ -20,15 +20,14 @@ router.post("/register", async (req, res) => {
 
     console.log("🔍 Checking existing user:", username, email);
     const existingUser = await User.findOne({ $or: [{ username }, { email }] });
-    
-    if (existingUser) {
-      console.log("✅ Query executed successfully");
-    if (existingUser) {
-      return res.status(400).json({ error: "Username already exists" });
-    }}
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = new User({ username, email, password: hashedPassword });
+
+    if (existingUser) {
+        console.log("✅ Query executed successfully");
+      return res.status(400).json({ error: "Username already exists" });
+    }
+
+    const newUser = new User({ username, email, password });
     await newUser.save();
 
     res.status(201).json({ message: "User registered successfully" });
@@ -42,6 +41,7 @@ router.post("/register", async (req, res) => {
 // User Login (POST)
 router.post("/login", async (req, res) => {
   try {
+    console.log("🔍 Received Login Request:", req.body); // ✅ Log the request body
     
     const { identifier, password } = req.body; // ✅ Accept either username or email
 
@@ -53,16 +53,23 @@ router.post("/login", async (req, res) => {
     console.log("🔍 Searching for user:", identifier);
 
     const user = await User.findOne({
-      $or: [{ username: { $regex: new RegExp(`^${identifier}$`, "i") } },
+      $or: [
+        { username: { $regex: new RegExp(`^${identifier}$`, "i") } },
         { email: { $regex: new RegExp(`^${identifier}$`, "i") } }],
     });
 
-    if (!user || !(await bcrypt.compare(password, user.password))) {
+    if (!user) {
       console.warn("❌ No user found with identifier:", identifier);
       return res.status(400).json({ error: "Invalid email or password" });
     }
 
+    console.log("🔍 Stored Hashed Password:", user.password); // ✅ Log the stored hashed password
+    console.log("🔍 Entered Password:", password); // ✅ Log the entered password
+
     const isMatch = await bcrypt.compare(password, user.password);
+    console.log("✅ Password Match:", isMatch); // ✅ Log if passwords match
+
+
     if (!isMatch) {
       console.warn("❌ Password does not match for:", identifier);
       return res.status(400).json({ error: "Invalid email or password" });
@@ -78,6 +85,7 @@ router.post("/login", async (req, res) => {
       })
       .json({ message: "Login successful", token });
       
+    console.log("✅ Login successful for:", identifier); 
   } catch (error) {
     console.error("Error logging in:", error);
     res.status(500).json({ error: "Internal Server Error" });
