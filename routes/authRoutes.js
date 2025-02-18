@@ -53,7 +53,8 @@ router.post("/login", async (req, res) => {
     console.log("🔍 Searching for user:", identifier);
 
     const user = await User.findOne({
-      $or: [{ username: identifier }, { email: identifier }],
+      $or: [{ username: { $regex: new RegExp(`^${identifier}$`, "i") } },
+        { email: { $regex: new RegExp(`^${identifier}$`, "i") } }],
     });
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
@@ -76,6 +77,7 @@ router.post("/login", async (req, res) => {
         sameSite: "Strict",
       })
       .json({ message: "Login successful", token });
+      
   } catch (error) {
     console.error("Error logging in:", error);
     res.status(500).json({ error: "Internal Server Error" });

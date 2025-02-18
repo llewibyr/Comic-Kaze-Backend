@@ -2,7 +2,6 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const mongoose = require("mongoose");
 const cookieParser = require("cookie-parser");
 
 // Import routes
@@ -19,7 +18,7 @@ const app = express();
 const PORT = process.env.PORT || 5001;
 
 // Middleware
-app.use(express.json());
+app.use(express.json()); // ✅ Fix: Ensure Express parses JSON
 app.use(cookieParser());
 app.use(
   cors({
